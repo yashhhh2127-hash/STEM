@@ -11,12 +11,14 @@ import {
   Layers,
   ChevronRight,
   Sparkles,
-  RotateCcw
+  RotateCcw,
+  LogOut,
+  Shield
 } from 'lucide-react';
 import { DEMO_STUDENTS } from '../../data/initialData';
 
 export const StudentProfileView: React.FC = () => {
-  const { currentStudent, setCurrentStudent, setCurrentStudentId, navigateTo, addToast } = useApp();
+  const { currentStudent, setCurrentStudent, setCurrentStudentId, navigateTo, addToast, authUser, logoutAdmin } = useApp();
 
   const handleSwitchStudent = (studentId: string) => {
     setCurrentStudentId(studentId);
@@ -77,27 +79,32 @@ export const StudentProfileView: React.FC = () => {
             </div>
           </div>
 
-          {/* Switch Student Profile Dropdown */}
-          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-center sm:text-left space-y-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
-              Demo Account Switcher:
-            </span>
-            <div className="space-y-1.5">
-              {DEMO_STUDENTS.map((stud) => (
-                <button
-                  key={stud.id}
-                  onClick={() => handleSwitchStudent(stud.id)}
-                  className={`w-full text-left px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center justify-between ${
-                    currentStudent.id === stud.id
-                      ? 'bg-indigo-600 text-white font-bold'
-                      : 'hover:bg-white text-slate-700'
-                  }`}
-                >
-                  <span className="truncate">{stud.name}</span>
-                  <span className="text-[10px] opacity-80">{stud.grade}</span>
-                </button>
-              ))}
+          {/* Authenticated Account Details & Actions */}
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-center sm:text-left space-y-3 min-w-[240px]">
+            <div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                Logged In Account:
+              </span>
+              <p className="text-xs font-bold text-slate-800 truncate">
+                {authUser?.email || 'student@stemlearn.local'}
+              </p>
+              <div className="flex items-center gap-1.5 mt-1">
+                <span className="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase tracking-wider">
+                  {authUser?.role || 'Student'}
+                </span>
+                <span className="text-[10px] text-slate-500">
+                  {authUser?.provider === 'google' ? '• Google OAuth' : '• Email / Password'}
+                </span>
+              </div>
             </div>
+
+            <button
+              onClick={logoutAdmin}
+              className="w-full py-2 px-3 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition cursor-pointer"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Sign Out of STEM Learn</span>
+            </button>
           </div>
         </div>
       </div>

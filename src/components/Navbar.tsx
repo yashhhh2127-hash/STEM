@@ -35,6 +35,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const {
     currentView,
     setCurrentView,
+    authUser,
     isAdminAuthenticated,
     logoutAdmin,
     currentStudent,
@@ -141,7 +142,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             </div>
 
-            {/* Student Profile Quick Link */}
+            {/* User Profile Quick Link */}
             <button
               onClick={() => setCurrentView('profile')}
               className={`flex items-center gap-2 p-1 sm:p-1.5 sm:pr-3 rounded-full border transition ${
@@ -150,33 +151,47 @@ export const Navbar: React.FC<NavbarProps> = ({
                   : 'border-slate-200/80 hover:border-slate-300 hover:bg-slate-50'
               }`}
               title="View Profile"
-              aria-label="Student Profile"
+              aria-label="User Profile"
             >
               <img
-                src={currentStudent.avatar}
-                alt={currentStudent.name}
+                src={authUser?.avatar || currentStudent.avatar}
+                alt={authUser?.name || currentStudent.name}
                 className="w-7 h-7 rounded-full object-cover ring-1 ring-slate-200"
               />
-              <span className="text-xs font-semibold text-slate-700 hidden lg:inline max-w-[85px] truncate">
-                {currentStudent.name.split(' ')[0]}
-              </span>
+              <div className="hidden lg:flex flex-col items-start leading-none text-left">
+                <span className="text-xs font-semibold text-slate-800 max-w-[90px] truncate">
+                  {(authUser?.name || currentStudent.name).split(' ')[0]}
+                </span>
+                <span className="text-[9px] font-bold text-indigo-600 uppercase tracking-wider">
+                  {authUser?.role || 'Student'}
+                </span>
+              </div>
             </button>
 
-            {/* Faculty / Admin Login button */}
-            {isAdminAuthenticated ? (
+            {/* Faculty / Admin Navigation button */}
+            {isAdminAuthenticated && (
               <button
                 onClick={() => setCurrentView('admin')}
-                className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100 transition"
+                className={`hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                  currentView === 'admin'
+                    ? 'bg-amber-100 text-amber-950 border border-amber-300 shadow-xs'
+                    : 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100'
+                }`}
               >
                 <ShieldCheck className="w-4 h-4 text-amber-700" />
                 <span>Admin</span>
               </button>
-            ) : (
+            )}
+
+            {/* Dedicated Sign Out / Logout button */}
+            {authUser && (
               <button
-                onClick={openAdminModal}
-                className="hidden lg:flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition"
+                onClick={logoutAdmin}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50/70 hover:bg-rose-100/80 border border-rose-200/60 transition cursor-pointer"
+                title="Sign out of STEM Learn"
               >
-                <span>Faculty</span>
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Sign Out</span>
               </button>
             )}
 

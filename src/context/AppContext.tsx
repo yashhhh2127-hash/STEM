@@ -64,6 +64,7 @@ interface AppContextType {
   registerAdmin: (name: string, email: string, pass: string, role?: string, department?: string) => Promise<{ success: boolean; message?: string }>;
   loginWithGoogle: (payload: { credential?: string; email?: string; name?: string; picture?: string; sub?: string; role?: string }) => Promise<{ success: boolean; message?: string }>;
   logoutAdmin: () => void;
+  logout: () => void;
   activeSubjectFilter: SubjectCategory | 'all';
   setActiveSubjectFilter: (filter: SubjectCategory | 'all') => void;
   selectedSubject?: SubjectCategory | 'all';
@@ -498,7 +499,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast('info', 'Learning Level Updated', `Set content preference for ${ageGroup} years tier.`);
   };
 
-  // Real MongoDB & Google Authentication (Mock credentials removed)
+  // Real MongoDB & Google Authentication
   const loginAdmin = async (email: string, pass: string): Promise<{ success: boolean; message?: string }> => {
     try {
       const res = await authApi.login(email, pass);
@@ -506,7 +507,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setAuthUser(res.user);
         const isAdmin = res.user.role === 'admin' || res.user.role === 'faculty';
         setIsAdminAuthenticated(isAdmin);
-        if (isAdmin) setRole('admin');
+        if (isAdmin) {
+          setRole('admin');
+          setCurrentView('admin');
+        } else {
+          setRole('student');
+          setCurrentView('dashboard');
+        }
+        setCurrentStudent((prev) => ({
+          ...prev,
+          name: res.user.name,
+          avatar: res.user.avatar || prev.avatar,
+        }));
         addToast('success', `Welcome back, ${res.user.name}!`, `Authenticated as ${res.user.role.toUpperCase()}`);
         return { success: true };
       }
@@ -516,14 +528,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const registerAdmin = async (name: string, email: string, pass: string, role: string = 'faculty', department?: string): Promise<{ success: boolean; message?: string }> => {
+  const registerAdmin = async (name: string, email: string, pass: string, role: string = 'student', department?: string): Promise<{ success: boolean; message?: string }> => {
     try {
       const res = await authApi.register({ name, email, password: pass, role, department });
       if (res.success && res.user) {
         setAuthUser(res.user);
         const isAdmin = res.user.role === 'admin' || res.user.role === 'faculty';
         setIsAdminAuthenticated(isAdmin);
-        if (isAdmin) setRole('admin');
+        if (isAdmin) {
+          setRole('admin');
+          setCurrentView('admin');
+        } else {
+          setRole('student');
+          setCurrentView('dashboard');
+        }
+        setCurrentStudent((prev) => ({
+          ...prev,
+          name: res.user.name,
+          avatar: res.user.avatar || prev.avatar,
+        }));
         addToast('success', 'Account Registered!', `Welcome to STEM Learn, ${res.user.name}`);
         return { success: true };
       }
@@ -540,7 +563,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setAuthUser(res.user);
         const isAdmin = res.user.role === 'admin' || res.user.role === 'faculty';
         setIsAdminAuthenticated(isAdmin);
-        if (isAdmin) setRole('admin');
+        if (isAdmin) {
+          setRole('admin');
+          setCurrentView('admin');
+        } else {
+          setRole('student');
+          setCurrentView('dashboard');
+        }
+        setCurrentStudent((prev) => ({
+          ...prev,
+          name: res.user.name,
+          avatar: res.user.avatar || prev.avatar,
+        }));
         addToast('success', 'Google Sign-In Successful!', `Welcome, ${res.user.name}`);
         return { success: true };
       }
@@ -556,8 +590,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsAdminAuthenticated(false);
     setRole('student');
     setCurrentView('home');
+
+    // Revoke Google session if Google Identity Services is loaded
+    try {
+      if (typeof (window as any).google !== 'undefined' && (window as any).google.accounts) {
+        (window as any).google.accounts.id.disableAutoSelect();
+      }
+    } catch { /* ignore */ }
+
     addToast('info', 'Logged Out', 'You have been signed out successfully.');
   };
+  const logout = logoutAdmin;
 
   // Navigation helper
   const navigateTo = (view: AppView, itemId?: string, category?: string) => {
@@ -736,6 +779,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         registerAdmin,
         loginWithGoogle,
         logoutAdmin,
+        logout,
         activeSubjectFilter,
         setActiveSubjectFilter,
         selectedSubject: activeSubjectFilter,
