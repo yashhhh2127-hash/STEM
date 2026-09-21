@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json.schemastore.org/web-manifest-combined.json",
+  "name": "STEM Learn - Interactive STEM Education Platform",
+  "short_name": "STEM Learn",
+  "id": "/",
+  "description": "Free digital STEM learning platform by SDES Department of Information Technology, Palghar with simulations, video lessons, interactive quizzes, coding lab, and STEM activities.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "any",
+  "background_color": "#0f172a",
+  "theme_color": "#4f46e5",
+  "categories": [
+    "education",
+    "science",
+    "technology",
+    "kids"
+  ],
+  "lang": "en",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192x192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512x512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Interactive Simulations",
+      "short_name": "Simulations",
+      "description": "Explore physics, chemistry, biology and robotics simulations",
+      "url": "/?view=simulations",
+      "icons": [
+        {
+          "src": "/icons/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Coding Lab",
+      "short_name": "Coding Lab",
+      "description": "Interactive code runner and practice editor",
+      "url": "/?view=coding",
+      "icons": [
+        {
+          "src": "/icons/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "STEM Quizzes",
+      "short_name": "Quizzes",
+      "description": "Test your STEM knowledge with interactive quizzes",
+      "url": "/?view=quizzes",
+      "icons": [
+        {
+          "src": "/icons/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Video Lessons",
+      "short_name": "Lessons",
+      "description": "Curated video lessons across STEM subjects",
+      "url": "/?view=videos",
+      "icons": [
+        {
+          "src": "/icons/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ],
+  "prefer_related_applications": false
+}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
+import { PWAProvider } from './context/PWAContext';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { MobileBottomNav } from './components/navigation/MobileBottomNav';
@@ -7,6 +8,9 @@ import { MobileDrawer } from './components/navigation/MobileDrawer';
 import { AdminAuthModal } from './components/common/AdminAuthModal';
 import { GlobalSearchModal } from './components/common/GlobalSearchModal';
 import { ToastContainer } from './components/common/ToastContainer';
+import { PWAInstallBanner } from './components/pwa/PWAInstallBanner';
+import { OfflineIndicator } from './components/pwa/OfflineIndicator';
+import { PWAUpdateToast } from './components/pwa/PWAUpdateToast';
 
 // Views
 import { HomeView } from './components/home/HomeView';
@@ -72,6 +76,8 @@ const MainContent: React.FC = () => {
         onOpenAdminLogin={() => setIsAdminModalOpen(true)}
       />
 
+      <OfflineIndicator />
+
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 pb-28 md:pb-12">
         {renderCurrentView()}
       </main>
@@ -99,14 +105,20 @@ const MainContent: React.FC = () => {
 
       <GlobalSearchModal />
       <ToastContainer />
+
+      {/* PWA Enhancements: Install Banner & Service Worker Update Toast */}
+      <PWAInstallBanner />
+      <PWAUpdateToast />
     </div>
   );
 };
 
 export default function App() {
   return (
-    <AppProvider>
-      <MainContent />
-    </AppProvider>
+    <PWAProvider>
+      <AppProvider>
+        <MainContent />
+      </AppProvider>
+    </PWAProvider>
   );
 }

@@ -15,9 +15,11 @@ import {
   X,
   User,
   LogOut,
-  Sparkles
+  Sparkles,
+  Download
 } from 'lucide-react';
 import { AdminAuthModal } from './common/AdminAuthModal';
+import { usePWA } from '../context/PWAContext';
 
 interface NavbarProps {
   onOpenMobileDrawer?: () => void;
@@ -38,6 +40,8 @@ export const Navbar: React.FC<NavbarProps> = ({
     currentStudent,
     setSearchModalOpen,
   } = useApp();
+
+  const { isInstallable, isInstalled, promptInstall } = usePWA();
 
   const [localAdminModalOpen, setLocalAdminModalOpen] = useState(false);
 
@@ -173,6 +177,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className="hidden lg:flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition"
               >
                 <span>Faculty</span>
+              </button>
+            )}
+
+            {/* Install PWA Button if available */}
+            {isInstallable && !isInstalled && (
+              <button
+                onClick={promptInstall}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs transition"
+                title="Install STEM Learn App"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Install App</span>
               </button>
             )}
 

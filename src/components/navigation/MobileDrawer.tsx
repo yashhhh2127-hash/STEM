@@ -13,8 +13,10 @@ import {
   Shield,
   ExternalLink,
   ChevronRight,
-  LogOut
+  LogOut,
+  Download
 } from 'lucide-react';
+import { usePWA } from '../../context/PWAContext';
 
 interface MobileDrawerProps {
   isOpen: boolean;
@@ -34,6 +36,8 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
     isAdminAuthenticated,
     logoutAdmin,
   } = useApp();
+
+  const { isInstallable, isInstalled, promptInstall } = usePWA();
 
   if (!isOpen) return null;
 
@@ -199,6 +203,30 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
             })}
           </div>
         </div>
+
+        {/* PWA Install Button if available */}
+        {!isInstalled && isInstallable && (
+          <div className="pt-1">
+            <button
+              onClick={() => {
+                promptInstall();
+                onClose();
+              }}
+              className="w-full p-3 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white rounded-2xl flex items-center justify-between shadow-md shadow-indigo-600/20 transition group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center text-white">
+                  <Download className="w-4 h-4" />
+                </div>
+                <div className="text-left">
+                  <p className="text-xs font-bold leading-tight">Install STEM Learn App</p>
+                  <p className="text-[10px] text-indigo-100">Offline access & fullscreen mode</p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-white/80 group-hover:translate-x-0.5 transition" />
+            </button>
+          </div>
+        )}
 
         {/* Platform Links */}
         <div className="space-y-2 pt-1 border-t border-slate-100">
