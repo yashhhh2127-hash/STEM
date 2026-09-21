@@ -17,11 +17,19 @@ import {
   Search,
   CheckCircle2,
   X,
-  FileText
+  FileText,
+  Database,
+  RefreshCw,
+  UserCheck,
+  ShieldAlert,
+  Server,
+  LogOut,
+  Check
 } from 'lucide-react';
 import { EducationalVideo, Quiz, STEMActivity, CodingProblem, STEMResource, SubjectCategory } from '../../types';
+import { authApi, AuthUser, SystemStatus } from '../../services/api';
 
-type AdminTab = 'analytics' | 'videos' | 'quizzes' | 'activities' | 'coding' | 'resources' | 'students';
+type AdminTab = 'analytics' | 'videos' | 'quizzes' | 'activities' | 'coding' | 'resources' | 'students' | 'users' | 'database';
 
 export const AdminDashboardView: React.FC = () => {
   const {
@@ -42,9 +50,87 @@ export const AdminDashboardView: React.FC = () => {
     deleteResource,
     currentStudent,
     addToast,
+    authUser,
+    logoutAdmin,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<AdminTab>('analytics');
+
+  // Registered Users (MongoDB) State
+  const [registeredUsers, setRegisteredUsers] = useState<AuthUser[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
+
+  // MongoDB Database Health State
+  const [dbHealth, setDbHealth] = useState<SystemStatus['database'] | null>(null);
+  const [loadingDb, setLoadingDb] = useState(false);
+
+  const fetchUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const res = await authApi.getUsers();
+      if (res.success && res.users) {
+        setRegisteredUsers(res.users);
+      }
+    } catch {
+      // offline or server not running
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const fetchDbHealth = async () => {
+    setLoadingDb(true);
+    try {
+      const res = await authApi.getSystemStatus();
+      if (res.database) {
+        setDbHealth(res.database);
+      }
+    } catch {
+      setDbHealth(null);
+    } finally {
+      setLoadingDb(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchDbHealth();
+  }, []);
+
+  React.useEffect(() => {
+    if (activeTab === 'users') {
+      fetchUsers();
+    } else if (activeTab === 'database') {
+      fetchDbHealth();
+    }
+  }, [activeTab]);
+
+  const handleUpdateRole = async (userId: string, newRole: 'admin' | 'faculty' | 'student') => {
+    try {
+      const res = await authApi.updateUserRole(userId, newRole);
+      if (res.success) {
+        setRegisteredUsers((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
+        );
+        addToast('success', 'Role Updated', `User role modified to ${newRole}`);
+      }
+    } catch (err: any) {
+      addToast('info', 'Update Notice', err.message || 'Could not update role in MongoDB');
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!window.confirm('Are you sure you want to remove this user from MongoDB?')) return;
+    try {
+      const res = await authApi.deleteUser(userId);
+      if (res.success) {
+        setRegisteredUsers((prev) => prev.filter((u) => u.id !== userId));
+        addToast('success', 'User Removed', 'User deleted from MongoDB');
+      }
+    } catch (err: any) {
+      addToast('info', 'Delete Notice', err.message || 'Could not delete user from MongoDB');
+    }
+  };
 
   // Video Form Modal State
   const [videoModalOpen, setVideoModalOpen] = useState(false);
@@ -170,11 +256,23 @@ export const AdminDashboardView: React.FC = () => {
           </p>
         </div>
 
-        <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10 text-right">
-          <span className="text-[10px] uppercase font-bold text-slate-300 block">CMS Status</span>
-          <span className="text-xs font-bold text-emerald-400 flex items-center justify-end gap-1 mt-0.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Live & Reactive
-          </span>
+        <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10 text-right flex flex-col items-end justify-between gap-2 min-w-[200px]">
+          <div>
+            <span className="text-[10px] uppercase font-bold text-slate-300 block">Logged In Staff</span>
+            <span className="text-xs font-bold text-white flex items-center justify-end gap-1.5 mt-0.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              {authUser?.name || 'Faculty / Admin'}
+            </span>
+            <span className="text-[10px] text-amber-300 block font-mono">
+              {authUser?.role?.toUpperCase() || 'ADMIN'} • {authUser?.email || 'MongoDB'}
+            </span>
+          </div>
+          <button
+            onClick={logoutAdmin}
+            className="px-2.5 py-1 bg-white/10 hover:bg-rose-500/80 text-white rounded-lg text-[11px] font-semibold flex items-center gap-1 transition mt-1"
+          >
+            <LogOut className="w-3 h-3" /> Log Out
+          </button>
         </div>
       </div>
 
@@ -188,7 +286,29 @@ export const AdminDashboardView: React.FC = () => {
               : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
           }`}
         >
-          <BarChart2 className="w-4 h-4" /> Engagement Analytics
+          <BarChart2 className="w-4 h-4" /> Analytics
+        </button>
+
+        <button
+          onClick={() => setActiveTab('users')}
+          className={`px-4 py-2.5 rounded-xl transition flex items-center gap-2 whitespace-nowrap ${
+            activeTab === 'users'
+              ? 'bg-indigo-600 text-white shadow-sm'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <Users className="w-4 h-4" /> Registered Users ({registeredUsers.length || (dbHealth?.userCount ?? 'DB')})
+        </button>
+
+        <button
+          onClick={() => setActiveTab('database')}
+          className={`px-4 py-2.5 rounded-xl transition flex items-center gap-2 whitespace-nowrap ${
+            activeTab === 'database'
+              ? 'bg-indigo-600 text-white shadow-sm'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <Database className="w-4 h-4" /> MongoDB {dbHealth?.connected ? '🟢' : '⚪'}
         </button>
 
         <button
@@ -608,6 +728,197 @@ export const AdminDashboardView: React.FC = () => {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 7: Registered Users (MongoDB) */}
+      {activeTab === 'users' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-900">
+              Registered Users — MongoDB ({registeredUsers.length})
+            </h3>
+            <button
+              onClick={fetchUsers}
+              disabled={loadingUsers}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${loadingUsers ? 'animate-spin' : ''}`} />
+              {loadingUsers ? 'Loading…' : 'Refresh'}
+            </button>
+          </div>
+
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
+              placeholder="Search users by name or email…"
+              className="w-full pl-9 pr-4 py-2.5 text-xs border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            />
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-slate-600">
+                    <th className="p-3 font-bold">Name</th>
+                    <th className="p-3 font-bold">Email</th>
+                    <th className="p-3 font-bold">Role</th>
+                    <th className="p-3 font-bold">Provider</th>
+                    <th className="p-3 font-bold">Joined</th>
+                    <th className="p-3 font-bold text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700">
+                  {registeredUsers
+                    .filter(
+                      (u) =>
+                        u.name.toLowerCase().includes(userSearch.toLowerCase()) ||
+                        u.email.toLowerCase().includes(userSearch.toLowerCase())
+                    )
+                    .map((u) => (
+                      <tr key={u.id} className="hover:bg-slate-50">
+                        <td className="p-3 font-semibold text-slate-900 flex items-center gap-2">
+                          {u.avatar ? (
+                            <img src={u.avatar} alt={u.name} className="w-6 h-6 rounded-full object-cover" />
+                          ) : (
+                            <span className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-[10px]">
+                              {u.name.charAt(0).toUpperCase()}
+                            </span>
+                          )}
+                          {u.name}
+                        </td>
+                        <td className="p-3 text-slate-500 font-mono">{u.email}</td>
+                        <td className="p-3">
+                          <select
+                            value={u.role}
+                            onChange={(e) =>
+                              handleUpdateRole(u.id, e.target.value as 'admin' | 'faculty' | 'student')
+                            }
+                            className="text-[11px] font-bold px-2 py-1 rounded-lg border border-slate-200 bg-white focus:outline-none"
+                          >
+                            <option value="student">Student</option>
+                            <option value="faculty">Faculty</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            u.provider === 'google'
+                              ? 'bg-blue-50 text-blue-700'
+                              : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {u.provider === 'google' ? '🔵 Google' : '🔑 Local'}
+                          </span>
+                        </td>
+                        <td className="p-3 text-slate-400 font-mono">
+                          {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}
+                        </td>
+                        <td className="p-3 text-right">
+                          <button
+                            onClick={() => handleDeleteUser(u.id)}
+                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                            title="Remove User"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  {registeredUsers.length === 0 && !loadingUsers && (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-slate-400">
+                        <Database className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                        <p className="font-semibold">No users found in MongoDB</p>
+                        <p className="text-[11px] mt-1">Make sure the backend server is running on port 5000.</p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 8: MongoDB Database Health */}
+      {activeTab === 'database' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-900">MongoDB Database Health</h3>
+            <button
+              onClick={fetchDbHealth}
+              disabled={loadingDb}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${loadingDb ? 'animate-spin' : ''}`} />
+              {loadingDb ? 'Checking…' : 'Refresh Status'}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Connection Status */}
+            <div className={`p-5 rounded-2xl border shadow-xs space-y-2 ${
+              dbHealth?.connected
+                ? 'bg-emerald-50 border-emerald-200'
+                : 'bg-rose-50 border-rose-200'
+            }`}>
+              <div className="flex items-center gap-2">
+                <Server className={`w-5 h-5 ${dbHealth?.connected ? 'text-emerald-600' : 'text-rose-500'}`} />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Connection</span>
+              </div>
+              <div className={`text-lg font-black ${dbHealth?.connected ? 'text-emerald-700' : 'text-rose-600'}`}>
+                {dbHealth == null ? '⏳ Checking…' : dbHealth.connected ? '✅ Connected' : '❌ Disconnected'}
+              </div>
+              {dbHealth?.host && (
+                <p className="text-[11px] text-slate-500 font-mono truncate">{dbHealth.host}</p>
+              )}
+            </div>
+
+            {/* User Count */}
+            <div className="p-5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-2">
+              <div className="flex items-center gap-2">
+                <UserCheck className="w-5 h-5 text-indigo-500" />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Registered Users</span>
+              </div>
+              <div className="text-2xl font-black text-indigo-600">
+                {dbHealth?.userCount ?? '—'}
+              </div>
+              <p className="text-[11px] text-slate-500">Total accounts in MongoDB collection</p>
+            </div>
+
+            {/* Database Name */}
+            <div className="p-5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-2">
+              <div className="flex items-center gap-2">
+                <Database className="w-5 h-5 text-amber-500" />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Database</span>
+              </div>
+              <div className="text-lg font-black text-slate-800 font-mono truncate">
+                {dbHealth?.dbName ?? 'stem_db'}
+              </div>
+              <p className="text-[11px] text-slate-500">Active Mongoose connection</p>
+            </div>
+          </div>
+
+          {/* Connection Guide */}
+          <div className="bg-slate-900 text-slate-100 rounded-2xl p-6 space-y-3 text-xs">
+            <div className="flex items-center gap-2 mb-2">
+              <ShieldAlert className="w-4 h-4 text-amber-400" />
+              <span className="font-bold text-amber-300 uppercase tracking-wider text-[11px]">Backend Setup Guide</span>
+            </div>
+            <p className="text-slate-400 leading-relaxed">Ensure the following in your <code className="bg-slate-800 px-1 py-0.5 rounded">.env</code> file at the project root:</p>
+            <pre className="bg-slate-800 rounded-xl p-4 overflow-x-auto text-emerald-300 font-mono text-[11px] leading-relaxed">
+{`MONGODB_URI=mongodb+srv://<user>:<pass>@cluster.mongodb.net/stem_db
+JWT_SECRET=your_super_secret_key
+GOOGLE_CLIENT_ID=<your_google_oauth_client_id>
+PORT=5000`}
+            </pre>
+            <p className="text-slate-400">Then run the backend with: <code className="bg-slate-800 px-1 py-0.5 rounded text-cyan-300">npm run server</code></p>
           </div>
         </div>
       )}

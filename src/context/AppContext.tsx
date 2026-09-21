@@ -28,6 +28,7 @@ import {
   INITIAL_DEMO_STUDENTS
 } from '../data/initialData';
 import confetti from 'canvas-confetti';
+import { authApi, AuthUser, getStoredUser, clearStoredAuth } from '../services/api';
 
 export type AppView =
   | 'home'
@@ -57,8 +58,11 @@ interface AppContextType {
   setCurrentView: (view: AppView) => void;
   role: 'student' | 'admin';
   setRole: (role: 'student' | 'admin') => void;
+  authUser: AuthUser | null;
   isAdminAuthenticated: boolean;
-  loginAdmin: (email: string, pass: string) => boolean;
+  loginAdmin: (email: string, pass: string) => Promise<{ success: boolean; message?: string }>;
+  registerAdmin: (name: string, email: string, pass: string, role?: string, department?: string) => Promise<{ success: boolean; message?: string }>;
+  loginWithGoogle: (payload: { credential?: string; email?: string; name?: string; picture?: string; sub?: string; role?: string }) => Promise<{ success: boolean; message?: string }>;
   logoutAdmin: () => void;
   activeSubjectFilter: SubjectCategory | 'all';
   setActiveSubjectFilter: (filter: SubjectCategory | 'all') => void;
@@ -158,9 +162,28 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentView, setCurrentView] = useState<AppView>('home');
   const [role, setRole] = useState<'student' | 'admin'>('student');
+  const [authUser, setAuthUser] = useState<AuthUser | null>(() => getStoredUser());
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState<boolean>(() => {
-    return localStorage.getItem('stem_admin_auth') === 'true';
+    const user = getStoredUser();
+    return Boolean(user && (user.role === 'admin' || user.role === 'faculty'));
   });
+
+  useEffect(() => {
+    if (getStoredUser()) {
+      authApi.getMe()
+        .then((res) => {
+          if (res.user) {
+            setAuthUser(res.user);
+            const isAdmin = res.user.role === 'admin' || res.user.role === 'faculty';
+            setIsAdminAuthenticated(isAdmin);
+            if (isAdmin) setRole('admin');
+          }
+        })
+        .catch(() => {
+          // Token expired or server offline
+        });
+    }
+  }, []);
 
   const [activeSubjectFilter, setActiveSubjectFilter] = useState<SubjectCategory | 'all'>('all');
   const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
@@ -475,35 +498,65 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast('info', 'Learning Level Updated', `Set content preference for ${ageGroup} years tier.`);
   };
 
-  // Admin Auth
-  const loginAdmin = (email: string, pass: string) => {
-    // Standard secure demo authentication check
-    if (email.trim().toLowerCase() === 'admin@palghar.edu' && pass === 'admin123') {
-      setIsAdminAuthenticated(true);
-      localStorage.setItem('stem_admin_auth', 'true');
-      setRole('admin');
-      setCurrentView('admin');
-      addToast('success', 'Admin Authenticated', 'Welcome to SDES IT Dept Admin Portal');
-      return true;
+  // Real MongoDB & Google Authentication (Mock credentials removed)
+  const loginAdmin = async (email: string, pass: string): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const res = await authApi.login(email, pass);
+      if (res.success && res.user) {
+        setAuthUser(res.user);
+        const isAdmin = res.user.role === 'admin' || res.user.role === 'faculty';
+        setIsAdminAuthenticated(isAdmin);
+        if (isAdmin) setRole('admin');
+        addToast('success', `Welcome back, ${res.user.name}!`, `Authenticated as ${res.user.role.toUpperCase()}`);
+        return { success: true };
+      }
+      return { success: false, message: res.message || 'Login failed' };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Authentication failed' };
     }
-    // Also allow single-click convenience demo authorization if user passes "demo"
-    if (email === 'demo' && pass === 'demo') {
-      setIsAdminAuthenticated(true);
-      localStorage.setItem('stem_admin_auth', 'true');
-      setRole('admin');
-      setCurrentView('admin');
-      addToast('success', 'Admin Authenticated', 'Logged in as IT Department Coordinator');
-      return true;
+  };
+
+  const registerAdmin = async (name: string, email: string, pass: string, role: string = 'faculty', department?: string): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const res = await authApi.register({ name, email, password: pass, role, department });
+      if (res.success && res.user) {
+        setAuthUser(res.user);
+        const isAdmin = res.user.role === 'admin' || res.user.role === 'faculty';
+        setIsAdminAuthenticated(isAdmin);
+        if (isAdmin) setRole('admin');
+        addToast('success', 'Account Registered!', `Welcome to STEM Learn, ${res.user.name}`);
+        return { success: true };
+      }
+      return { success: false, message: res.message || 'Registration failed' };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Registration error' };
     }
-    return false;
+  };
+
+  const loginWithGoogle = async (payload: { credential?: string; email?: string; name?: string; picture?: string; sub?: string; role?: string }): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const res = await authApi.googleAuth(payload);
+      if (res.success && res.user) {
+        setAuthUser(res.user);
+        const isAdmin = res.user.role === 'admin' || res.user.role === 'faculty';
+        setIsAdminAuthenticated(isAdmin);
+        if (isAdmin) setRole('admin');
+        addToast('success', 'Google Sign-In Successful!', `Welcome, ${res.user.name}`);
+        return { success: true };
+      }
+      return { success: false, message: res.message || 'Google authentication failed' };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Google sign-in error' };
+    }
   };
 
   const logoutAdmin = () => {
+    clearStoredAuth();
+    setAuthUser(null);
     setIsAdminAuthenticated(false);
-    localStorage.removeItem('stem_admin_auth');
     setRole('student');
     setCurrentView('home');
-    addToast('info', 'Logged Out', 'Returned to Student Mode');
+    addToast('info', 'Logged Out', 'You have been signed out successfully.');
   };
 
   // Navigation helper
@@ -677,8 +730,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCurrentView,
         role,
         setRole,
+        authUser,
         isAdminAuthenticated,
         loginAdmin,
+        registerAdmin,
+        loginWithGoogle,
         logoutAdmin,
         activeSubjectFilter,
         setActiveSubjectFilter,
