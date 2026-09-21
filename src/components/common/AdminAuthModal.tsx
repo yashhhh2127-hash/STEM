@@ -55,10 +55,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
   const [dbStatus, setDbStatus] = useState<SystemStatus['database'] | null>(null);
   const [isCheckingDb, setIsCheckingDb] = useState(false);
 
-  // Google button containers & instances
-  const googleBtnRef = useRef<HTMLDivElement>(null);
-
-  // Handle credential response from Google ID token (GIS button or prompt)
+  // Handle credential response from Google ID token
   const handleGoogleCredentialResponse = useCallback(
     async (response: any) => {
       if (!response?.credential) {
@@ -93,38 +90,6 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
     },
     [loginWithGoogle, onClose, selectedRole, setCurrentView]
   );
-
-  // Initialize official Google ID button & One Tap
-  const initGoogleIdButton = useCallback(() => {
-    const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID;
-    if (!clientId || typeof google === 'undefined' || !google.accounts?.id) {
-      return;
-    }
-
-    try {
-      google.accounts.id.initialize({
-        client_id: clientId,
-        callback: handleGoogleCredentialResponse,
-        auto_select: false,
-        cancel_on_tap_outside: true,
-      });
-
-      if (googleBtnRef.current) {
-        googleBtnRef.current.innerHTML = '';
-        google.accounts.id.renderButton(googleBtnRef.current, {
-          type: 'standard',
-          theme: 'outline',
-          size: 'large',
-          width: 320,
-          text: 'signin_with',
-          shape: 'rectangular',
-          logo_alignment: 'left',
-        });
-      }
-    } catch (err) {
-      console.warn('[Google Sign-In] Init button error:', err);
-    }
-  }, [handleGoogleCredentialResponse]);
 
   // Direct Google OAuth 2.0 Popup Trigger
   const triggerGooglePopup = () => {
@@ -197,9 +162,13 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
         return;
       }
 
-      // Fallback: Google Accounts ID prompt / renderButton
+      // Fallback: Google Accounts ID initialize & prompt
       if (google.accounts?.id) {
-        initGoogleIdButton();
+        google.accounts.id.initialize({
+          client_id: clientId,
+          callback: handleGoogleCredentialResponse,
+          auto_select: false,
+        });
         google.accounts.id.prompt();
       }
     } catch (err: any) {
@@ -233,15 +202,6 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
       isMounted = false;
     };
   }, [isOpen]);
-
-  // Load Google SDK Button when modal opens or role changes
-  useEffect(() => {
-    if (!isOpen) return;
-    const timer = setTimeout(() => {
-      initGoogleIdButton();
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [isOpen, selectedRole, initGoogleIdButton]);
 
   if (!isOpen) return null;
 
@@ -498,9 +458,6 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
             </span>
             <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition" />
           </button>
-
-          {/* Official Google Button Render target if loaded */}
-          <div ref={googleBtnRef} className="mt-2 flex justify-center empty:hidden"></div>
 
           <div className="relative my-3.5">
             <div className="absolute inset-0 flex items-center">
