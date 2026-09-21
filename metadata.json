@@ -1,0 +1,6 @@
+{
+  "name": "STEM Learn - Interactive STEM Education Platform",
+  "description": "Free digital STEM learning platform by SDES Department of Information Technology, Palghar with simulations, video lessons, interactive quizzes, coding lab, and STEM activities.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
