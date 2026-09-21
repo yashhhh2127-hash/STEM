@@ -53,22 +53,35 @@ export const HomeView: React.FC = () => {
           </p>
 
           {/* Primary Action Buttons */}
-          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto">
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-3 max-w-xl mx-auto">
             <button
-              onClick={() => navigateTo('simulations')}
-              className="w-full sm:w-auto px-7 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm transition shadow-sm hover:shadow flex items-center justify-center gap-2"
+              onClick={() => navigateTo('videos')}
+              className="px-6 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl text-sm transition shadow-sm hover:shadow flex items-center justify-center gap-2 cursor-pointer"
             >
-              <span>Explore Simulations</span>
-              <ArrowRight className="w-4 h-4" />
+              <PlayCircle className="w-4 h-4" />
+              <span>Watch Free Video Lessons</span>
             </button>
 
             <button
-              onClick={() => navigateTo('coding')}
-              className="w-full sm:w-auto px-6 py-3.5 bg-white hover:bg-slate-50 text-slate-700 font-semibold border border-slate-200 rounded-xl text-sm transition shadow-xs flex items-center justify-center gap-2"
+              onClick={() => navigateTo('simulations')}
+              className="px-6 py-3.5 bg-white hover:bg-slate-50 text-slate-700 font-semibold border border-slate-200 rounded-xl text-sm transition shadow-xs flex items-center justify-center gap-2 cursor-pointer"
             >
-              <Code className="w-4 h-4 text-slate-500" />
-              <span>Coding Sandbox</span>
+              <Cpu className="w-4 h-4 text-indigo-600" />
+              <span>Interactive Simulations</span>
             </button>
+          </div>
+
+          {/* Access tiers pill banner */}
+          <div className="inline-flex flex-wrap items-center justify-center gap-3 sm:gap-4 py-2 px-4 rounded-2xl bg-slate-100/90 border border-slate-200/90 text-xs text-slate-600">
+            <span className="flex items-center gap-1.5 font-medium">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span><strong>Free Open Access:</strong> Video Lessons & Tools Hub</span>
+            </span>
+            <span className="hidden sm:inline text-slate-300">•</span>
+            <span className="flex items-center gap-1.5 font-medium">
+              <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+              <span><strong>Free Account Unlocks:</strong> Simulations, Coding Lab & Quizzes</span>
+            </span>
           </div>
 
           {/* Quick Search Bar Trigger */}

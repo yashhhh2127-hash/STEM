@@ -15,6 +15,8 @@ import {
   X,
   User,
   LogOut,
+  LogIn,
+  Lock,
   Sparkles,
   Download
 } from 'lucide-react';
@@ -90,18 +92,22 @@ export const Navbar: React.FC<NavbarProps> = ({
           <nav className="hidden xl:flex items-center gap-1 text-sm font-medium text-slate-600">
             {navItems.map((item) => {
               const isActive = currentView === item.id;
+              const isProtected = !authUser && ['simulations', 'coding', 'quizzes', 'activities', 'challenges', 'dashboard'].includes(item.id);
               return (
                 <button
                   key={item.id}
                   onClick={() => setCurrentView(item.id)}
-                  className={`px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all text-[13px] ${
+                  className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all text-[13px] ${
                     isActive
                       ? 'text-indigo-600 bg-indigo-50/80 font-semibold'
                       : 'text-slate-600 hover:text-slate-950 hover:bg-slate-100/70'
                   }`}
                 >
                   {item.icon}
-                  {item.label}
+                  <span>{item.label}</span>
+                  {isProtected && (
+                    <Lock className="w-2.5 h-2.5 text-slate-400" />
+                  )}
                 </button>
               );
             })}
@@ -142,56 +148,66 @@ export const Navbar: React.FC<NavbarProps> = ({
               </div>
             </div>
 
-            {/* User Profile Quick Link */}
-            <button
-              onClick={() => setCurrentView('profile')}
-              className={`flex items-center gap-2 p-1 sm:p-1.5 sm:pr-3 rounded-full border transition ${
-                currentView === 'profile'
-                  ? 'border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-500/10'
-                  : 'border-slate-200/80 hover:border-slate-300 hover:bg-slate-50'
-              }`}
-              title="View Profile"
-              aria-label="User Profile"
-            >
-              <img
-                src={authUser?.avatar || currentStudent.avatar}
-                alt={authUser?.name || currentStudent.name}
-                className="w-7 h-7 rounded-full object-cover ring-1 ring-slate-200"
-              />
-              <div className="hidden lg:flex flex-col items-start leading-none text-left">
-                <span className="text-xs font-semibold text-slate-800 max-w-[90px] truncate">
-                  {(authUser?.name || currentStudent.name).split(' ')[0]}
-                </span>
-                <span className="text-[9px] font-bold text-indigo-600 uppercase tracking-wider">
-                  {authUser?.role || 'Student'}
-                </span>
-              </div>
-            </button>
+            {authUser ? (
+              <>
+                {/* User Profile Quick Link */}
+                <button
+                  onClick={() => setCurrentView('profile')}
+                  className={`flex items-center gap-2 p-1 sm:p-1.5 sm:pr-3 rounded-full border transition ${
+                    currentView === 'profile'
+                      ? 'border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-500/10'
+                      : 'border-slate-200/80 hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                  title="View Profile"
+                  aria-label="User Profile"
+                >
+                  <img
+                    src={authUser.avatar || currentStudent.avatar}
+                    alt={authUser.name || currentStudent.name}
+                    className="w-7 h-7 rounded-full object-cover ring-1 ring-slate-200"
+                  />
+                  <div className="hidden lg:flex flex-col items-start leading-none text-left">
+                    <span className="text-xs font-semibold text-slate-800 max-w-[90px] truncate">
+                      {(authUser.name || currentStudent.name).split(' ')[0]}
+                    </span>
+                    <span className="text-[9px] font-bold text-indigo-600 uppercase tracking-wider">
+                      {authUser.role || 'Student'}
+                    </span>
+                  </div>
+                </button>
 
-            {/* Faculty / Admin Navigation button */}
-            {isAdminAuthenticated && (
-              <button
-                onClick={() => setCurrentView('admin')}
-                className={`hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
-                  currentView === 'admin'
-                    ? 'bg-amber-100 text-amber-950 border border-amber-300 shadow-xs'
-                    : 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100'
-                }`}
-              >
-                <ShieldCheck className="w-4 h-4 text-amber-700" />
-                <span>Admin</span>
-              </button>
-            )}
+                {/* Faculty / Admin Navigation button */}
+                {isAdminAuthenticated && (
+                  <button
+                    onClick={() => setCurrentView('admin')}
+                    className={`hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                      currentView === 'admin'
+                        ? 'bg-amber-100 text-amber-950 border border-amber-300 shadow-xs'
+                        : 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100'
+                    }`}
+                  >
+                    <ShieldCheck className="w-4 h-4 text-amber-700" />
+                    <span>Admin</span>
+                  </button>
+                )}
 
-            {/* Dedicated Sign Out / Logout button */}
-            {authUser && (
+                {/* Dedicated Sign Out / Logout button */}
+                <button
+                  onClick={logoutAdmin}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50/70 hover:bg-rose-100/80 border border-rose-200/60 transition cursor-pointer"
+                  title="Sign out of STEM Learn"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Sign Out</span>
+                </button>
+              </>
+            ) : (
               <button
-                onClick={logoutAdmin}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50/70 hover:bg-rose-100/80 border border-rose-200/60 transition cursor-pointer"
-                title="Sign out of STEM Learn"
+                onClick={openAdminModal}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 transition cursor-pointer"
               >
-                <LogOut className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Sign Out</span>
+                <LogIn className="w-3.5 h-3.5" />
+                <span>Sign In (Free)</span>
               </button>
             )}
 
