@@ -160,6 +160,43 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+/** Build a completely blank StudentProfile for a newly authenticated user */
+const createFreshStudentProfile = (user: AuthUser): StudentProfile => ({
+  id: `stu-${user.id}`,
+  name: user.name,
+  email: user.email,
+  avatar: user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=6366f1&color=fff&size=120`,
+  ageGroup: '13-15',
+  grade: '',
+  schoolName: '',
+  xp: 0,
+  streakDays: 0,
+  completedLessons: [],
+  completedVideos: [],
+  completedSimulations: [],
+  solvedProblems: [],
+  completedCoding: [],
+  completedActivities: [],
+  badges: [],
+  quizScores: {},
+  subjectMastery: { science: 0, mathematics: 0, technology: 0, engineering: 0 },
+  quizAttempts: [],
+  codingSubmissions: [],
+  level: 1,
+  joinedDate: new Date().toISOString().split('T')[0],
+  active: true,
+});
+
+/** Load or create a per-user profile stored under a user-specific localStorage key */
+const loadStudentForUser = (user: AuthUser): StudentProfile => {
+  const key = `stem_student_profile_${user.id}`;
+  const saved = localStorage.getItem(key);
+  if (saved) {
+    try { return JSON.parse(saved); } catch { /* fall through */ }
+  }
+  return createFreshStudentProfile(user);
+};
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentView, setCurrentView] = useState<AppView>('home');
   const [role, setRole] = useState<'student' | 'admin'>('student');
@@ -236,8 +273,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [currentStudent, setCurrentStudent] = useState<StudentProfile>(() => {
-    const saved = localStorage.getItem('stem_current_student');
-    return saved ? JSON.parse(saved) : INITIAL_DEMO_STUDENTS[0];
+    // If a real user is already authenticated, load their per-user profile (fresh by default)
+    const storedUser = getStoredUser();
+    if (storedUser) {
+      return loadStudentForUser(storedUser);
+    }
+    // No auth → show demo profile for browsing
+    return INITIAL_DEMO_STUDENTS[0];
   });
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -272,7 +314,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [students]);
 
   useEffect(() => {
+    // Persist under the generic key for backwards compat
     localStorage.setItem('stem_current_student', JSON.stringify(currentStudent));
+    // Also persist under the user-specific key if a real user is logged in
+    const storedUser = getStoredUser();
+    if (storedUser && currentStudent.id === `stu-${storedUser.id}`) {
+      localStorage.setItem(`stem_student_profile_${storedUser.id}`, JSON.stringify(currentStudent));
+    }
   }, [currentStudent]);
 
   const addToast = (toastOrType: any, title?: string, message?: string) => {
@@ -514,11 +562,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setRole('student');
           setCurrentView('dashboard');
         }
-        setCurrentStudent((prev) => ({
-          ...prev,
-          name: res.user.name,
-          avatar: res.user.avatar || prev.avatar,
-        }));
+        // Load the user's own profile (fresh if first login, existing if returning)
+        setCurrentStudent(loadStudentForUser(res.user));
         addToast('success', `Welcome back, ${res.user.name}!`, `Authenticated as ${res.user.role.toUpperCase()}`);
         return { success: true };
       }
@@ -542,11 +587,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setRole('student');
           setCurrentView('dashboard');
         }
-        setCurrentStudent((prev) => ({
-          ...prev,
-          name: res.user.name,
-          avatar: res.user.avatar || prev.avatar,
-        }));
+        // Brand-new registration → always give a fresh blank profile
+        const freshProfile = createFreshStudentProfile(res.user);
+        setCurrentStudent(freshProfile);
+        localStorage.setItem(`stem_student_profile_${res.user.id}`, JSON.stringify(freshProfile));
         addToast('success', 'Account Registered!', `Welcome to STEM Learn, ${res.user.name}`);
         return { success: true };
       }
@@ -570,11 +614,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setRole('student');
           setCurrentView('dashboard');
         }
-        setCurrentStudent((prev) => ({
-          ...prev,
-          name: res.user.name,
-          avatar: res.user.avatar || prev.avatar,
-        }));
+        // Load or create the user's own profile (no demo data carry-over)
+        setCurrentStudent(loadStudentForUser(res.user));
         addToast('success', 'Google Sign-In Successful!', `Welcome, ${res.user.name}`);
         return { success: true };
       }
@@ -590,6 +631,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsAdminAuthenticated(false);
     setRole('student');
     setCurrentView('home');
+    // Reset to the demo profile so the UI still has something to render when logged out
+    setCurrentStudent(INITIAL_DEMO_STUDENTS[0]);
+    localStorage.removeItem('stem_current_student');
 
     // Revoke Google session if Google Identity Services is loaded
     try {
