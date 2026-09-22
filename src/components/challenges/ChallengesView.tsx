@@ -11,7 +11,12 @@ import {
   ShieldCheck,
   Trophy,
   ArrowRight,
-  ExternalLink
+  ExternalLink,
+  Compass,
+  Code,
+  Atom,
+  Calculator,
+  Beaker
 } from 'lucide-react';
 import { BADGES_LIST } from '../../data/initialData';
 
@@ -288,37 +293,54 @@ export const ChallengesView: React.FC = () => {
 
             <div className="space-y-2.5">
               {BADGES_LIST.map((badge) => {
-                const unlocked = currentStudent.badges.some((b) => b.id === badge.id);
+                const unlocked = currentStudent.badges.some((b: any) =>
+                  typeof b === 'string' ? b === badge.id : b?.id === badge.id
+                );
+
+                const getIcon = (name: string) => {
+                  const iconProps = { className: `w-5 h-5 ${unlocked ? 'text-amber-600' : 'text-slate-400'}` };
+                  switch (name?.toLowerCase()) {
+                    case 'compass': return <Compass {...iconProps} />;
+                    case 'code': return <Code {...iconProps} />;
+                    case 'atom': return <Atom {...iconProps} />;
+                    case 'calculator': return <Calculator {...iconProps} />;
+                    case 'zap': return <Zap {...iconProps} />;
+                    case 'flame': return <Flame {...iconProps} />;
+                    case 'beaker': return <Beaker {...iconProps} />;
+                    case 'award':
+                    default: return <Award {...iconProps} />;
+                  }
+                };
 
                 return (
                   <div
                     key={badge.id}
-                    className={`p-3 rounded-xl border transition flex items-start gap-3 ${
+                    className={`p-3 rounded-xl border transition-all flex items-start gap-3 ${
                       unlocked
-                        ? 'bg-amber-50/50 border-amber-300/80 shadow-xs'
-                        : 'bg-slate-50 border-slate-200 opacity-60'
+                        ? 'bg-gradient-to-r from-amber-50/70 to-orange-50/50 border-amber-300 shadow-xs'
+                        : 'bg-slate-50 border-slate-200/80 opacity-60'
                     }`}
                   >
                     <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0 ${
-                        unlocked ? 'bg-amber-100 shadow-inner' : 'bg-slate-200 grayscale'
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform ${
+                        unlocked ? 'bg-amber-100 shadow-inner' : 'bg-slate-200'
                       }`}
                     >
-                      {badge.icon}
+                      {getIcon(badge.icon)}
                     </div>
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <h4 className="text-xs font-bold text-slate-900 truncate">
-                          {badge.name}
+                          {badge.title || badge.name}
                         </h4>
                         {unlocked && (
-                          <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.2 rounded">
+                          <span className="text-[10px] font-bold text-amber-800 bg-amber-200/70 px-2 py-0.5 rounded-full border border-amber-300/60">
                             UNLOCKED
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                      <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
                         {badge.description}
                       </p>
                     </div>

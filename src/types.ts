@@ -52,7 +52,7 @@ export interface SimulationConfig {
   ageGroup?: AgeGroup;
   description: string;
   instructions: string[];
-  type: 'projectile' | 'circuit' | 'grapher' | 'atom' | 'cell' | 'robotics';
+  type: 'projectile' | 'circuit' | 'grapher' | 'atom' | 'cell' | 'robotics' | 'gravity' | 'optics';
   published?: boolean;
   xpReward?: number;
   relatedVideoId?: string;

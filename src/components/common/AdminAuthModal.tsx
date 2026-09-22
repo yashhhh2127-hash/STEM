@@ -1,24 +1,21 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
-  ShieldCheck,
   X,
-  UserPlus,
   LogIn,
-  Database,
+  UserPlus,
+  Lock,
+  Mail,
+  User,
+  GraduationCap,
+  ShieldCheck,
   AlertCircle,
   CheckCircle2,
-  Lock,
-  GraduationCap,
-  Users,
-  Sparkles,
+  Loader2,
   ArrowRight,
-  School,
-  Zap,
 } from 'lucide-react';
 import { authApi, SystemStatus, PRESET_DEMO_ACCOUNTS } from '../../services/api';
 
-// Declare Google Identity Services global type
 declare const google: any;
 
 interface AdminAuthModalProps {
@@ -34,725 +31,404 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
 }) => {
   const { loginAdmin, registerAdmin, loginWithGoogle, setCurrentView } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
-  const [selectedRole, setSelectedRole] = useState<'student' | 'faculty' | 'admin'>('student');
+  const [tab, setTab] = useState<'login' | 'register'>('login');
+  const [role, setRole] = useState<'student' | 'faculty'>('student');
 
-  // Login form state
+  // Fields
   const [loginEmail, setLoginEmail] = useState('');
-  const [loginPass, setLoginPass] = useState('');
+  const [loginPass, setLoginPass]   = useState('');
+  const [regName, setRegName]       = useState('');
+  const [regEmail, setRegEmail]     = useState('');
+  const [regPass, setRegPass]       = useState('');
 
-  // Register form state
-  const [regName, setRegName] = useState('');
-  const [regEmail, setRegEmail] = useState('');
-  const [regPass, setRegPass] = useState('');
-  const [regDept, setRegDept] = useState('Department of Information Technology, SDES');
+  // State
+  const [loading, setLoading]   = useState(false);
+  const [gLoading, setGLoading] = useState(false);
+  const [error, setError]       = useState('');
+  const [success, setSuccess]   = useState('');
+  const [dbOnline, setDbOnline] = useState<boolean | null>(null);
 
-  // Feedback states
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
+  // Check DB once on open
+  useEffect(() => {
+    if (!isOpen) return;
+    authApi.getSystemStatus()
+      .then((res) => setDbOnline(res.database?.connected ?? false))
+      .catch(() => setDbOnline(false));
+  }, [isOpen]);
 
-  // Database status
-  const [dbStatus, setDbStatus] = useState<SystemStatus['database'] | null>(null);
-  const [isCheckingDb, setIsCheckingDb] = useState(false);
-
-  // Quick 1-Click Demo Login Handler
-  const handleQuickDemoLogin = async (roleType: 'student' | 'admin') => {
-    setIsSubmitting(true);
-    setErrorMessage('');
-    setSuccessMessage('');
-
-    const account = PRESET_DEMO_ACCOUNTS[roleType];
-    setLoginEmail(account.email);
-    setLoginPass(account.password);
-
-    try {
-      const result = await loginAdmin(account.email, account.password);
-      if (result.success) {
-        setSuccessMessage(`Logged in as ${account.name}! Redirecting...`);
-        setTimeout(() => {
-          onClose();
-          setCurrentView(roleType === 'admin' ? 'admin' : 'dashboard');
-        }, 400);
-      } else {
-        setErrorMessage(result.message || 'Demo login failed.');
-      }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Error signing in to demo account.');
-    } finally {
-      setIsSubmitting(false);
-    }
+  // Reset on tab switch
+  const switchTab = (t: 'login' | 'register') => {
+    setTab(t);
+    setError('');
+    setSuccess('');
   };
 
-  // Google Demo Account Fallback
-  const handleDemoGoogleLogin = async () => {
-    setIsSubmitting(true);
-    setErrorMessage('');
-    try {
-      const result = await loginWithGoogle({
-        email: selectedRole === 'student' ? 'google.student@stemlearn.edu' : 'google.faculty@stemlearn.edu',
-        name: selectedRole === 'student' ? 'Google STEM Scholar' : 'Dr. Google Faculty',
-        role: selectedRole,
-      });
-
-      if (result.success) {
-        setSuccessMessage('Google demo authentication successful! Entering platform...');
-        setTimeout(() => {
-          onClose();
-          setCurrentView(selectedRole === 'student' ? 'dashboard' : 'admin');
-        }, 400);
-      } else {
-        setErrorMessage(result.message || 'Google demo sign-in failed.');
-      }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Google demo error.');
-    } finally {
-      setIsSubmitting(false);
-    }
+  const finish = (isAdmin: boolean) => {
+    setSuccess('Welcome! Taking you in…');
+    setTimeout(() => {
+      onClose();
+      setCurrentView(isAdmin ? 'admin' : 'dashboard');
+    }, 500);
   };
 
-  // Handle credential response from Google ID token
-  const handleGoogleCredentialResponse = useCallback(
-    async (response: any) => {
-      if (!response?.credential) {
-        setErrorMessage('Google sign-in was cancelled or returned no credential.');
-        setIsSubmitting(false);
-        return;
-      }
+  /* ── Login ── */
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true); setError(''); setSuccess('');
+    const res = await loginAdmin(loginEmail, loginPass);
+    setLoading(false);
+    if (res.success) finish(role === 'faculty');
+    else setError(res.message || 'Invalid credentials.');
+  };
 
-      setIsSubmitting(true);
-      setErrorMessage('');
+  /* ── Register ── */
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (regPass.length < 6) { setError('Password must be at least 6 characters.'); return; }
+    setLoading(true); setError(''); setSuccess('');
+    const res = await registerAdmin(regName, regEmail, regPass, role === 'faculty' ? 'faculty' : 'student');
+    setLoading(false);
+    if (res.success) finish(role === 'faculty');
+    else setError(res.message || 'Registration failed.');
+  };
 
-      try {
-        const result = await loginWithGoogle({
-          credential: response.credential,
-          role: selectedRole,
-        });
+  /* ── Google ── */
+  const handleGoogleCredential = useCallback(async (response: any) => {
+    if (!response?.credential) { setGLoading(false); setError('Google sign-in cancelled.'); return; }
+    const res = await loginWithGoogle({ credential: response.credential, role });
+    setGLoading(false);
+    if (res.success) finish(role === 'faculty');
+    else setError(res.message || 'Google sign-in failed.');
+  }, [loginWithGoogle, role]);
 
-        if (result.success) {
-          setSuccessMessage('Google authentication successful! Redirecting...');
-          setTimeout(() => {
-            onClose();
-            setCurrentView(selectedRole === 'student' ? 'dashboard' : 'admin');
-          }, 500);
-        } else {
-          setErrorMessage(result.message || 'Google sign-in failed.');
-        }
-      } catch (err: any) {
-        setErrorMessage(err.message || 'Google authentication error.');
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    [loginWithGoogle, onClose, selectedRole, setCurrentView]
-  );
-
-  // Direct Google OAuth 2.0 Popup Trigger
-  const triggerGooglePopup = () => {
+  const triggerGoogle = async () => {
+    setGLoading(true); setError('');
     const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID;
 
-    if (!clientId) {
-      // If no clientId or invalid origin, offer fallback immediately
-      handleDemoGoogleLogin();
+    if (!clientId || typeof google === 'undefined') {
+      // Fallback: demo google account
+      const res = await loginWithGoogle({
+        email: role === 'student' ? 'google.student@stemlearn.edu' : 'google.faculty@stemlearn.edu',
+        name:  role === 'student' ? 'STEM Scholar' : 'Dr. Faculty',
+        role,
+      });
+      setGLoading(false);
+      if (res.success) finish(role === 'faculty');
+      else setError(res.message || 'Google sign-in failed.');
       return;
     }
-
-    if (typeof google === 'undefined') {
-      // If Google library is blocked, fallback immediately
-      handleDemoGoogleLogin();
-      return;
-    }
-
-    setErrorMessage('');
-    setIsSubmitting(true);
 
     try {
       if (google.accounts?.oauth2) {
-        const tokenClient = google.accounts.oauth2.initTokenClient({
+        const client = google.accounts.oauth2.initTokenClient({
           client_id: clientId,
           scope: 'email profile openid',
-          callback: async (tokenResponse: any) => {
-            if (tokenResponse.error) {
-              setIsSubmitting(false);
-              setErrorMessage(`Google notice: ${tokenResponse.error_description || tokenResponse.error}. You can use the Quick Demo or Demo Google account.`);
-              return;
-            }
-
-            try {
-              const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-              });
-              const profile = await userInfoRes.json();
-
-              const result = await loginWithGoogle({
-                email: profile.email,
-                name: profile.name,
-                picture: profile.picture,
-                sub: profile.sub,
-                role: selectedRole,
-              });
-
-              if (result.success) {
-                setSuccessMessage(`Welcome, ${profile.name || 'Learner'}! Entering platform...`);
-                setTimeout(() => {
-                  onClose();
-                  setCurrentView(selectedRole === 'student' ? 'dashboard' : 'admin');
-                }, 500);
-              } else {
-                setErrorMessage(result.message || 'Google authentication failed.');
-              }
-            } catch (err: any) {
-              setErrorMessage(err.message || 'Failed to retrieve Google profile.');
-            } finally {
-              setIsSubmitting(false);
-            }
+          callback: async (tok: any) => {
+            if (tok.error) { setGLoading(false); setError('Google: ' + tok.error_description); return; }
+            const profile = await (await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+              headers: { Authorization: `Bearer ${tok.access_token}` },
+            })).json();
+            const res = await loginWithGoogle({ email: profile.email, name: profile.name, picture: profile.picture, sub: profile.sub, role });
+            setGLoading(false);
+            if (res.success) finish(role === 'faculty');
+            else setError(res.message || 'Google sign-in failed.');
           },
         });
-
-        tokenClient.requestAccessToken({ prompt: 'select_account' });
-        return;
-      }
-
-      if (google.accounts?.id) {
-        google.accounts.id.initialize({
-          client_id: clientId,
-          callback: handleGoogleCredentialResponse,
-          auto_select: false,
-        });
+        client.requestAccessToken({ prompt: 'select_account' });
+      } else if (google.accounts?.id) {
+        google.accounts.id.initialize({ client_id: clientId, callback: handleGoogleCredential, auto_select: false });
         google.accounts.id.prompt();
       }
     } catch (err: any) {
-      setIsSubmitting(false);
-      setErrorMessage(err.message || 'Failed to launch Google Sign-In popup.');
+      setGLoading(false);
+      setError(err.message || 'Failed to open Google sign-in.');
     }
   };
 
-  // Check MongoDB connection status whenever modal is visible
-  useEffect(() => {
-    if (!isOpen) return;
-
-    let isMounted = true;
-    setIsCheckingDb(true);
-
-    authApi
-      .getSystemStatus()
-      .then((res) => {
-        if (isMounted && res.database) {
-          setDbStatus(res.database);
-        }
-      })
-      .catch(() => {
-        if (isMounted) setDbStatus(null);
-      })
-      .finally(() => {
-        if (isMounted) setIsCheckingDb(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isOpen]);
+  /* ── Quick demo ── */
+  const quickDemo = async (type: 'student' | 'admin') => {
+    setLoading(true); setError('');
+    const acc = PRESET_DEMO_ACCOUNTS[type];
+    const res = await loginAdmin(acc.email, acc.password);
+    setLoading(false);
+    if (res.success) finish(type === 'admin');
+    else setError(res.message || 'Demo login failed.');
+  };
 
   if (!isOpen) return null;
 
-  // Handle Login Submit
-  const handleLoginSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setErrorMessage('');
-    setSuccessMessage('');
-
-    try {
-      const result = await loginAdmin(loginEmail, loginPass);
-      if (result.success) {
-        setSuccessMessage('Authenticated successfully! Entering platform...');
-        setTimeout(() => {
-          onClose();
-        }, 500);
-      } else {
-        setErrorMessage(result.message || 'Login failed. Please check your credentials.');
-      }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Error communicating with authentication service.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Handle Registration Submit
-  const handleRegisterSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setErrorMessage('');
-    setSuccessMessage('');
-
-    if (regPass.length < 6) {
-      setErrorMessage('Password must be at least 6 characters long.');
-      setIsSubmitting(false);
-      return;
-    }
-
-    try {
-      const result = await registerAdmin(
-        regName,
-        regEmail,
-        regPass,
-        selectedRole,
-        selectedRole !== 'student' ? regDept : undefined
-      );
-      if (result.success) {
-        setSuccessMessage('Account registered successfully! Welcome to STEM Learn.');
-        setTimeout(() => {
-          onClose();
-        }, 500);
-      } else {
-        setErrorMessage(result.message || 'Registration failed.');
-      }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Error creating account in database.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-all duration-300 ${
-        isGate
-          ? 'bg-slate-950/85 backdrop-blur-md'
-          : 'bg-slate-950/70 backdrop-blur-xs'
-      }`}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(15,23,42,0.7)', backdropFilter: 'blur(8px)' }}
+      onClick={!isGate ? (e) => { if (e.target === e.currentTarget) onClose(); } : undefined}
     >
-      <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-6 sm:p-8 border border-slate-200 relative overflow-hidden max-h-[92vh] overflow-y-auto">
-        {/* Subtle background glow */}
-        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
+      <div
+        className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
+        style={{ animation: 'modalIn 0.2s ease' }}
+      >
+        {/* ── Gradient top bar ── */}
+        <div
+          className="h-1.5 w-full"
+          style={{ background: 'linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%)' }}
+        />
 
-        {/* Close Button only if not in Gate mode */}
-        {!isGate && (
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-2 rounded-xl transition hover:bg-slate-100 cursor-pointer"
-            aria-label="Close dialog"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        )}
-
-        {/* Portal Header */}
-        <div className="flex items-center gap-3.5 mb-5 relative z-10">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-indigo-700 text-white flex items-center justify-center shadow-lg shadow-indigo-600/25 flex-shrink-0">
-            {selectedRole === 'student' ? (
-              <GraduationCap className="w-6 h-6" />
-            ) : (
-              <ShieldCheck className="w-6 h-6" />
+        {/* ── Header ── */}
+        <div className="px-6 pt-5 pb-4 border-b border-slate-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-white flex-shrink-0"
+                style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}
+              >
+                {role === 'faculty' ? <ShieldCheck className="w-5 h-5" /> : <GraduationCap className="w-5 h-5" />}
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-slate-900">
+                  {tab === 'login' ? 'Welcome back' : 'Create account'}
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  STEM<span className="text-indigo-600 font-semibold">Learn</span> · SDES Palghar
+                </p>
+              </div>
+            </div>
+            {!isGate && (
+              <button
+                onClick={onClose}
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
             )}
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-xl font-extrabold text-slate-900 tracking-tight">
-                STEM<span className="text-indigo-600">Learn</span> Portal
-              </h3>
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                Palghar
+        </div>
+
+        {/* ── Body ── */}
+        <div className="px-6 py-5 space-y-4">
+
+          {/* Role toggle — compact segmented control */}
+          <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl text-xs font-semibold">
+            {(['student', 'faculty'] as const).map((r) => (
+              <button
+                key={r}
+                onClick={() => setRole(r)}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg transition-all ${
+                  role === r
+                    ? 'bg-white text-indigo-600 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                {r === 'student' ? <GraduationCap className="w-3.5 h-3.5" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                {r === 'student' ? 'Student' : 'Faculty / Admin'}
+              </button>
+            ))}
+          </div>
+
+          {/* Google sign-in */}
+          <button
+            onClick={triggerGoogle}
+            disabled={loading || gLoading}
+            className="w-full flex items-center justify-center gap-2.5 py-2.5 px-4 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl text-sm font-medium text-slate-700 transition shadow-xs disabled:opacity-50"
+          >
+            {gLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+            ) : (
+              <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+              </svg>
+            )}
+            Continue with Google
+          </button>
+
+          {/* Divider */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-200" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-white px-3 text-[11px] text-slate-400 uppercase tracking-wider font-medium">
+                or use email
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              SDES Department of Information Technology • STEM Education
-            </p>
           </div>
-        </div>
 
-        {/* Instant 1-Click Demo Logins Banner */}
-        <div className="mb-4 p-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl border border-indigo-100">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-900 flex items-center gap-1.5">
-              <Zap className="w-3.5 h-3.5 text-indigo-600" /> Instant Quick Sign-In (1-Click):
-            </span>
-            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.5 rounded">
-              Ready
-            </span>
+          {/* Tab switcher */}
+          <div className="flex gap-4 border-b border-slate-100 -mb-1">
+            {(['login', 'register'] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => switchTab(t)}
+                className={`pb-2.5 text-sm font-semibold border-b-2 transition-all -mb-px ${
+                  tab === t
+                    ? 'border-indigo-500 text-indigo-600'
+                    : 'border-transparent text-slate-400 hover:text-slate-700'
+                }`}
+              >
+                {t === 'login' ? 'Sign In' : 'Register'}
+              </button>
+            ))}
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={() => handleQuickDemoLogin('student')}
-              className="py-2 px-2.5 rounded-xl bg-white hover:bg-indigo-600 hover:text-white text-indigo-900 border border-indigo-200 hover:border-indigo-600 text-xs font-bold transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60"
-            >
-              <GraduationCap className="w-4 h-4" />
-              <span>Student Demo</span>
-            </button>
-            <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={() => handleQuickDemoLogin('admin')}
-              className="py-2 px-2.5 rounded-xl bg-white hover:bg-slate-900 hover:text-white text-slate-800 border border-slate-200 hover:border-slate-900 text-xs font-bold transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60"
-            >
-              <ShieldCheck className="w-4 h-4" />
-              <span>Faculty Demo</span>
-            </button>
-          </div>
-        </div>
 
-        {/* Database Status Indicator */}
-        <div className="mb-4 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2">
-            <Database className="w-4 h-4 text-indigo-600" />
-            <span className="text-slate-600 font-medium">Auth Service:</span>
-          </div>
-          {isCheckingDb ? (
-            <span className="text-slate-400 text-[11px]">Verifying...</span>
-          ) : dbStatus?.connected ? (
-            <span className="inline-flex items-center gap-1.5 text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60 text-[11px]">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              Online ({dbStatus.dbName || 'MongoDB Active'})
-            </span>
-          ) : (
-            <span
-              className="inline-flex items-center gap-1 text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60 text-[11px]"
-              title="Built-in resilient storage active"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-              Online (Resilient Mode)
-            </span>
+          {/* Error / Success */}
+          {error && (
+            <div className="flex items-start gap-2.5 p-3 bg-rose-50 border border-rose-200/80 rounded-xl text-sm text-rose-700">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
+          {success && (
+            <div className="flex items-center gap-2.5 p-3 bg-emerald-50 border border-emerald-200/80 rounded-xl text-sm text-emerald-700">
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+              <span>{success}</span>
+            </div>
+          )}
+
+          {/* ── Login form ── */}
+          {tab === 'login' && (
+            <form onSubmit={handleLogin} className="space-y-3">
+              <Field
+                label="Email"
+                type="email"
+                value={loginEmail}
+                onChange={setLoginEmail}
+                placeholder="you@example.com"
+                icon={<Mail className="w-4 h-4 text-slate-400" />}
+                required
+              />
+              <Field
+                label="Password"
+                type="password"
+                value={loginPass}
+                onChange={setLoginPass}
+                placeholder="••••••••"
+                icon={<Lock className="w-4 h-4 text-slate-400" />}
+                required
+              />
+
+              <button
+                type="submit"
+                disabled={loading || gLoading}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white transition shadow-md disabled:opacity-50"
+                style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
+                {loading ? 'Signing in…' : 'Sign In'}
+              </button>
+
+              {/* Demo shortcuts — subtle, below main button */}
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-[11px] text-slate-400 flex-shrink-0">Try demo:</span>
+                <button
+                  type="button"
+                  onClick={() => quickDemo('student')}
+                  disabled={loading || gLoading}
+                  className="text-[11px] font-semibold text-indigo-600 hover:underline disabled:opacity-50"
+                >
+                  Student
+                </button>
+                <span className="text-slate-300">·</span>
+                <button
+                  type="button"
+                  onClick={() => quickDemo('admin')}
+                  disabled={loading || gLoading}
+                  className="text-[11px] font-semibold text-indigo-600 hover:underline disabled:opacity-50"
+                >
+                  Faculty
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* ── Register form ── */}
+          {tab === 'register' && (
+            <form onSubmit={handleRegister} className="space-y-3">
+              <Field
+                label="Full Name"
+                type="text"
+                value={regName}
+                onChange={setRegName}
+                placeholder={role === 'student' ? 'e.g. Yash Kini' : 'e.g. Prof. R. Sharma'}
+                icon={<User className="w-4 h-4 text-slate-400" />}
+                required
+              />
+              <Field
+                label="Email"
+                type="email"
+                value={regEmail}
+                onChange={setRegEmail}
+                placeholder="you@example.com"
+                icon={<Mail className="w-4 h-4 text-slate-400" />}
+                required
+              />
+              <Field
+                label="Password"
+                type="password"
+                value={regPass}
+                onChange={setRegPass}
+                placeholder="Min 6 characters"
+                icon={<Lock className="w-4 h-4 text-slate-400" />}
+                required
+              />
+
+              <button
+                type="submit"
+                disabled={loading || gLoading}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white transition shadow-md disabled:opacity-50"
+                style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                {loading ? 'Creating account…' : `Create ${role === 'student' ? 'Student' : 'Faculty'} Account`}
+              </button>
+            </form>
           )}
         </div>
 
-        {/* Role Selector: Student vs Faculty/Admin */}
-        <div className="mb-4">
-          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-            Select Your Account Type:
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setSelectedRole('student')}
-              className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
-                selectedRole === 'student'
-                  ? 'border-indigo-600 bg-indigo-50/70 text-indigo-950 ring-2 ring-indigo-500/20 shadow-xs'
-                  : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700'
-              }`}
-            >
-              <div
-                className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                  selectedRole === 'student'
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'bg-slate-100 text-slate-600'
-                }`}
-              >
-                <GraduationCap className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-xs font-bold leading-tight">Student</p>
-                <p className="text-[10px] text-slate-500">Learning & Labs</p>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setSelectedRole('faculty')}
-              className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
-                selectedRole !== 'student'
-                  ? 'border-indigo-600 bg-indigo-50/70 text-indigo-950 ring-2 ring-indigo-500/20 shadow-xs'
-                  : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700'
-              }`}
-            >
-              <div
-                className={`w-9 h-9 rounded-xl flex items-center justify-center ${
-                  selectedRole !== 'student'
-                    ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'bg-slate-100 text-slate-600'
-                }`}
-              >
-                <Users className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="text-xs font-bold leading-tight">Faculty / Admin</p>
-                <p className="text-[10px] text-slate-500">CMS & Teaching</p>
-              </div>
-            </button>
-          </div>
-        </div>
-
-        {/* Tab Switcher: Login vs Register */}
-        <div className="grid grid-cols-2 p-1 bg-slate-100 rounded-xl mb-4 text-xs font-semibold">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab('login');
-              setErrorMessage('');
-            }}
-            className={`py-2 rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer ${
-              activeTab === 'login'
-                ? 'bg-white text-indigo-600 shadow-xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <LogIn className="w-3.5 h-3.5" />
-            <span>Sign In</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab('register');
-              setErrorMessage('');
-            }}
-            className={`py-2 rounded-lg flex items-center justify-center gap-1.5 transition cursor-pointer ${
-              activeTab === 'register'
-                ? 'bg-white text-indigo-600 shadow-xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <UserPlus className="w-3.5 h-3.5" />
-            <span>Create Account</span>
-          </button>
-        </div>
-
-        {/* Google Popup Sign-In Action */}
-        <div className="mb-4">
-          <button
-            type="button"
-            onClick={triggerGooglePopup}
-            disabled={isSubmitting}
-            className="w-full py-2.5 px-4 bg-white hover:bg-slate-50 active:bg-slate-100 border border-slate-300 hover:border-slate-400 rounded-xl text-xs font-bold text-slate-800 flex items-center justify-center gap-2.5 transition shadow-xs disabled:opacity-60 group cursor-pointer"
-          >
-            <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-              />
-            </svg>
-            <span>
-              Continue with Google ({selectedRole === 'student' ? 'Student' : 'Faculty'})
-            </span>
-            <ArrowRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition" />
-          </button>
-
-          <div className="relative my-3.5">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200"></div>
-            </div>
-            <div className="relative flex justify-center text-[11px] uppercase">
-              <span className="bg-white px-2.5 text-slate-400 font-semibold tracking-wider">
-                or sign in with credentials
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Error / Success Notifications */}
-        {errorMessage && (
-          <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 space-y-2 animate-in fade-in">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">{errorMessage}</div>
-            </div>
-            {/* Quick Demo fallback action inside error */}
-            <div className="pt-1.5 border-t border-rose-200 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickDemoLogin(selectedRole === 'student' ? 'student' : 'admin')}
-                className="px-2.5 py-1 bg-rose-700 hover:bg-rose-800 text-white rounded-lg text-[11px] font-bold transition cursor-pointer"
-              >
-                Sign in with Demo {selectedRole === 'student' ? 'Student' : 'Faculty'}
-              </button>
-              <button
-                type="button"
-                onClick={handleDemoGoogleLogin}
-                className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-[11px] font-semibold transition cursor-pointer"
-              >
-                Continue with Demo Google Account
-              </button>
-            </div>
-          </div>
-        )}
-
-        {successMessage && (
-          <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-700 flex items-start gap-2 animate-in fade-in">
-            <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-            <div className="flex-1 font-medium">{successMessage}</div>
-          </div>
-        )}
-
-        {/* TAB 1: LOGIN FORM */}
-        {activeTab === 'login' && (
-          <form onSubmit={handleLoginSubmit} className="space-y-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Email Address
-              </label>
-              <input
-                type="email"
-                value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="w-full text-xs border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  type="password"
-                  value={loginPass}
-                  onChange={(e) => setLoginPass(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full text-xs border border-slate-200 rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                  required
-                />
-                <Lock className="w-3.5 h-3.5 text-slate-400 absolute right-3.5 top-3" />
-              </div>
-            </div>
-
-            {/* Quick Autofill Helper Chips */}
-            <div className="p-2 bg-slate-50 rounded-xl border border-slate-200/60 text-[11px] text-slate-500 space-y-1.5">
-              <span className="font-semibold text-slate-700 block">Click to auto-fill credentials:</span>
-              <div className="flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLoginEmail(PRESET_DEMO_ACCOUNTS.student.email);
-                    setLoginPass(PRESET_DEMO_ACCOUNTS.student.password);
-                    setSelectedRole('student');
-                  }}
-                  className="px-2 py-0.5 rounded-md bg-white border border-slate-200 hover:border-indigo-400 hover:text-indigo-600 transition font-medium cursor-pointer"
-                >
-                  🎓 student@stemlearn.edu (student123)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLoginEmail(PRESET_DEMO_ACCOUNTS.admin.email);
-                    setLoginPass(PRESET_DEMO_ACCOUNTS.admin.password);
-                    setSelectedRole('faculty');
-                  }}
-                  className="px-2 py-0.5 rounded-md bg-white border border-slate-200 hover:border-indigo-400 hover:text-indigo-600 transition font-medium cursor-pointer"
-                >
-                  🛡️ admin@stemlearn.edu (admin123)
-                </button>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full mt-2 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition shadow-md shadow-indigo-600/20 disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
-            >
-              {isSubmitting ? (
-                <>Verifying credentials...</>
-              ) : (
-                <>
-                  <LogIn className="w-4 h-4" /> Sign In to STEM Learn
-                </>
-              )}
-            </button>
-          </form>
-        )}
-
-        {/* TAB 2: REGISTER FORM */}
-        {activeTab === 'register' && (
-          <form onSubmit={handleRegisterSubmit} className="space-y-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Full Name
-              </label>
-              <input
-                type="text"
-                value={regName}
-                onChange={(e) => setRegName(e.target.value)}
-                placeholder={selectedRole === 'student' ? 'e.g. Yash Kini' : 'e.g. Prof. R. Sharma'}
-                className="w-full text-xs border border-slate-200 rounded-xl px-3.5 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Email Address
-              </label>
-              <input
-                type="email"
-                value={regEmail}
-                onChange={(e) => setRegEmail(e.target.value)}
-                placeholder="you@example.com"
-                className="w-full text-xs border border-slate-200 rounded-xl px-3.5 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Password (min 6 characters)
-              </label>
-              <input
-                type="password"
-                value={regPass}
-                onChange={(e) => setRegPass(e.target.value)}
-                placeholder="••••••••"
-                className="w-full text-xs border border-slate-200 rounded-xl px-3.5 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                required
-              />
-            </div>
-
-            {selectedRole !== 'student' && (
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Department / Institution
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={regDept}
-                    onChange={(e) => setRegDept(e.target.value)}
-                    placeholder="Department of Information Technology, SDES"
-                    className="w-full text-xs border border-slate-200 rounded-xl px-3.5 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
-                  />
-                  <School className="w-3.5 h-3.5 text-slate-400 absolute right-3.5 top-2.5" />
-                </div>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full mt-2 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition shadow-md shadow-indigo-600/20 disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
-            >
-              {isSubmitting ? (
-                <>Creating account...</>
-              ) : (
-                <>
-                  <UserPlus className="w-4 h-4" /> Create Account as {selectedRole === 'student' ? 'Student' : 'Faculty'}
-                </>
-              )}
-            </button>
-          </form>
-        )}
-
-        {/* Feature summary */}
-        <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-          <span className="flex items-center gap-1">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Free Open-Access STEM
+        {/* ── Footer ── */}
+        <div className="px-6 pb-5 flex items-center justify-between text-[11px] text-slate-400">
+          <span>
+            {dbOnline === true && <span className="inline-flex items-center gap-1 text-emerald-600"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" /> Live</span>}
+            {dbOnline === false && <span className="text-amber-600">Offline mode active</span>}
           </span>
-          <span>Google OAuth & JWT Encrypted</span>
+          <span>Free · Open Access · Palghar STEM</span>
         </div>
       </div>
+
+      <style>{`
+        @keyframes modalIn {
+          from { opacity: 0; transform: scale(0.96) translateY(8px); }
+          to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+      `}</style>
     </div>
   );
 };
+
+/* ─── Reusable input field ─────────────────────────── */
+interface FieldProps {
+  label: string;
+  type: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  icon: React.ReactNode;
+  required?: boolean;
+}
+const Field: React.FC<FieldProps> = ({ label, type, value, onChange, placeholder, icon, required }) => (
+  <div>
+    <label className="block text-xs font-semibold text-slate-600 mb-1.5">{label}</label>
+    <div className="relative">
+      <div className="absolute left-3 top-1/2 -translate-y-1/2">{icon}</div>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        required={required}
+        className="w-full pl-9 pr-3.5 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-400 transition bg-white placeholder:text-slate-300"
+      />
+    </div>
+  </div>
+);

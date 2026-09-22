@@ -6,6 +6,8 @@ import { GraphingCalculatorSim } from './GraphingCalculatorSim';
 import { AtomModelSim } from './AtomModelSim';
 import { CellExplorerSim } from './CellExplorerSim';
 import { RoboticsArmSim } from './RoboticsArmSim';
+import { GravityOrbitSim } from './GravityOrbitSim';
+import { OpticsRefractionSim } from './OpticsRefractionSim';
 import {
   Cpu,
   Atom,
@@ -176,11 +178,11 @@ export const SimulationContainer: React.FC = () => {
         {activeTab === 'sim-projectile' && (
           <ProjectileMotionSim onComplete={() => handleSimCompleted('sim-projectile')} />
         )}
-        {activeTab === 'sim-circuits' && (
-          <CircuitBuilderSim onComplete={() => handleSimCompleted('sim-circuits')} />
+        {(activeTab === 'sim-circuit' || activeTab === 'sim-circuits') && (
+          <CircuitBuilderSim onComplete={() => handleSimCompleted(activeTab)} />
         )}
-        {activeTab === 'sim-graphing' && (
-          <GraphingCalculatorSim onComplete={() => handleSimCompleted('sim-graphing')} />
+        {(activeTab === 'sim-grapher' || activeTab === 'sim-graphing') && (
+          <GraphingCalculatorSim onComplete={() => handleSimCompleted(activeTab)} />
         )}
         {activeTab === 'sim-atom' && (
           <AtomModelSim onComplete={() => handleSimCompleted('sim-atom')} />
@@ -190,6 +192,12 @@ export const SimulationContainer: React.FC = () => {
         )}
         {activeTab === 'sim-robotics' && (
           <RoboticsArmSim onComplete={() => handleSimCompleted('sim-robotics')} />
+        )}
+        {(activeTab === 'sim-gravity' || activeTab === 'sim-orbit') && (
+          <GravityOrbitSim onComplete={() => handleSimCompleted(activeTab)} />
+        )}
+        {(activeTab === 'sim-optics' || activeTab === 'sim-waves') && (
+          <OpticsRefractionSim onComplete={() => handleSimCompleted(activeTab)} />
         )}
       </div>
 

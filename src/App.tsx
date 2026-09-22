@@ -9,6 +9,7 @@ import { AdminAuthModal } from './components/common/AdminAuthModal';
 import { AuthRequiredGate } from './components/common/AuthRequiredGate';
 import { GlobalSearchModal } from './components/common/GlobalSearchModal';
 import { ToastContainer } from './components/common/ToastContainer';
+import { BadgeCelebrationModal } from './components/common/BadgeCelebrationModal';
 import { PWAInstallBanner } from './components/pwa/PWAInstallBanner';
 import { OfflineIndicator } from './components/pwa/OfflineIndicator';
 import { PWAUpdateToast } from './components/pwa/PWAUpdateToast';
@@ -127,6 +128,7 @@ const MainContent: React.FC = () => {
 
       <GlobalSearchModal />
       <ToastContainer />
+      <BadgeCelebrationModal />
 
       {/* PWA Enhancements: Install Banner & Service Worker Update Toast */}
       <PWAInstallBanner />

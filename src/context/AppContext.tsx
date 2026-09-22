@@ -117,6 +117,8 @@ interface AppContextType {
   completeCodingProblem: (problemId: string, xp?: number) => void;
   completeActivity: (activityId: string, xp?: number) => void;
   unlockBadge: (badgeId: string) => void;
+  unlockedBadgeModal: Badge | null;
+  closeBadgeModal: () => void;
   switchAgeGroup: (ageGroup: StudentProfile['ageGroup']) => void;
 
   // Admin CMS
@@ -233,25 +235,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [searchModalOpen, setSearchModalOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // LocalStorage cached or initial
+  // LocalStorage cached or initial with automated merge for new additions
   const [videos, setVideos] = useState<VideoLesson[]>(() => {
     const saved = localStorage.getItem('stem_videos');
-    return saved ? JSON.parse(saved) : INITIAL_VIDEOS;
+    if (!saved) return INITIAL_VIDEOS;
+    try {
+      const parsed: VideoLesson[] = JSON.parse(saved);
+      const existingIds = new Set(parsed.map((v) => v.id));
+      const newItems = INITIAL_VIDEOS.filter((v) => !existingIds.has(v.id));
+      return [...parsed, ...newItems];
+    } catch {
+      return INITIAL_VIDEOS;
+    }
   });
 
   const [simulations, setSimulations] = useState<SimulationConfig[]>(() => {
     const saved = localStorage.getItem('stem_simulations');
-    return saved ? JSON.parse(saved) : INITIAL_SIMULATIONS;
+    if (!saved) return INITIAL_SIMULATIONS;
+    try {
+      const parsed: SimulationConfig[] = JSON.parse(saved);
+      const existingIds = new Set(parsed.map((s) => s.id));
+      const newItems = INITIAL_SIMULATIONS.filter((s) => !existingIds.has(s.id));
+      return [...parsed, ...newItems];
+    } catch {
+      return INITIAL_SIMULATIONS;
+    }
   });
 
   const [quizzes, setQuizzes] = useState<Quiz[]>(() => {
     const saved = localStorage.getItem('stem_quizzes');
-    return saved ? JSON.parse(saved) : INITIAL_QUIZZES;
+    if (!saved) return INITIAL_QUIZZES;
+    try {
+      const parsed: Quiz[] = JSON.parse(saved);
+      const existingIds = new Set(parsed.map((q) => q.id));
+      const newItems = INITIAL_QUIZZES.filter((q) => !existingIds.has(q.id));
+      return [...parsed, ...newItems];
+    } catch {
+      return INITIAL_QUIZZES;
+    }
   });
 
   const [codingProblems, setCodingProblems] = useState<CodingProblem[]>(() => {
     const saved = localStorage.getItem('stem_coding_problems');
-    return saved ? JSON.parse(saved) : INITIAL_CODING_PROBLEMS;
+    if (!saved) return INITIAL_CODING_PROBLEMS;
+    try {
+      const parsed: CodingProblem[] = JSON.parse(saved);
+      const existingIds = new Set(parsed.map((p) => p.id));
+      const newItems = INITIAL_CODING_PROBLEMS.filter((p) => !existingIds.has(p.id));
+      return [...parsed, ...newItems];
+    } catch {
+      return INITIAL_CODING_PROBLEMS;
+    }
   });
 
   const [activities, setActivities] = useState<STEMActivity[]>(() => {
@@ -283,6 +317,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [unlockedBadgeModal, setUnlockedBadgeModal] = useState<Badge | null>(null);
+
+  const closeBadgeModal = () => {
+    setUnlockedBadgeModal(null);
+  };
 
   // Auto-sync storage
   useEffect(() => {
@@ -352,12 +391,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     addToast('xp', `+${amount} XP Earned!`, reason);
 
-    // Check automatic badge threshold
+    // Check automatic badge threshold by XP
     badges.forEach((b) => {
-      if (b.xpThreshold && currentStudent.xp + amount >= b.xpThreshold && !currentStudent.badges.includes(b.id)) {
+      const alreadyHas = currentStudent.badges.some((has: any) =>
+        typeof has === 'string' ? has === b.id : has?.id === b.id
+      );
+      if (b.xpThreshold && currentStudent.xp + amount >= b.xpThreshold && !alreadyHas) {
         unlockBadge(b.id);
       }
     });
+
+    if (currentStudent.streakDays >= 7) {
+      unlockBadge('badge-streak-champion');
+    }
   };
 
   const addXp = (amount: number) => {
@@ -373,34 +419,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const unlockBadge = (badgeId: string) => {
     const badge = badges.find((b) => b.id === badgeId);
-    if (!badge || currentStudent.badges.includes(badgeId)) return;
+    if (!badge) return;
 
-    setCurrentStudent((prev) => ({
-      ...prev,
-      badges: [...prev.badges, badgeId],
-    }));
+    const alreadyHas = currentStudent.badges.some((has: any) =>
+      typeof has === 'string' ? has === badgeId : has?.id === badgeId
+    );
+    if (alreadyHas) return;
+
+    setCurrentStudent((prev) => {
+      const hasPrev = prev.badges.some((has: any) =>
+        typeof has === 'string' ? has === badgeId : has?.id === badgeId
+      );
+      if (hasPrev) return prev;
+      return {
+        ...prev,
+        badges: [...prev.badges, badgeId],
+      };
+    });
 
     try {
       confetti({
         particleCount: 80,
         spread: 70,
-        origin: { y: 0.7 }
+        origin: { y: 0.7 },
       });
     } catch {
       // safe fallback
     }
 
+    setUnlockedBadgeModal(badge);
     addToast('badge', `Badge Unlocked: ${badge.title}!`, badge.description);
   };
 
   const completeLesson = (lessonId: string) => {
     if (!currentStudent.completedLessons.includes(lessonId)) {
+      const updatedLessons = [...currentStudent.completedLessons, lessonId];
       setCurrentStudent((prev) => ({
         ...prev,
-        completedLessons: [...prev.completedLessons, lessonId],
+        completedLessons: updatedLessons,
         completedVideos: [...(prev.completedVideos || []), lessonId],
       }));
       awardXP(50, 'Completed Video Lesson');
+
+      if (updatedLessons.length + currentStudent.completedSimulations.length >= 5) {
+        unlockBadge('badge-science-explorer');
+      }
     }
   };
 
@@ -410,25 +473,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const completeSimulation = (simId: string, xp: number = 100) => {
     if (!currentStudent.completedSimulations.includes(simId)) {
+      const updatedSims = [...currentStudent.completedSimulations, simId];
       setCurrentStudent((prev) => ({
         ...prev,
-        completedSimulations: [...prev.completedSimulations, simId],
+        completedSimulations: updatedSims,
       }));
       awardXP(xp, 'Explored Interactive Simulation');
-      if (!currentStudent.badges.includes('badge-first-explorer')) {
-        unlockBadge('badge-first-explorer');
+
+      unlockBadge('badge-first-explorer');
+
+      if (simId === 'sim-circuit' || simId === 'sim-circuits') {
+        unlockBadge('badge-circuit-builder');
+      }
+
+      if (currentStudent.completedLessons.length + updatedSims.length >= 5) {
+        unlockBadge('badge-science-explorer');
       }
     }
   };
 
   const recordQuizAttempt = (attempt: QuizAttempt) => {
+    const updatedScores = {
+      ...(currentStudent.quizScores || {}),
+      [attempt.quizId]: attempt.percentage,
+    };
+
     setCurrentStudent((prev) => ({
       ...prev,
       quizAttempts: [attempt, ...prev.quizAttempts],
-      quizScores: {
-        ...(prev.quizScores || {}),
-        [attempt.quizId]: attempt.percentage,
-      },
+      quizScores: updatedScores,
     }));
 
     // Update Quiz stats in state
@@ -451,9 +524,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     awardXP(xp, `Scored ${attempt.score}/${attempt.totalQuestions} (${attempt.percentage}%) on ${attempt.quizTitle}`);
 
     if (attempt.percentage >= 85) {
-      if (attempt.subject === 'mathematics' && !currentStudent.badges.includes('badge-math-master')) {
+      if (attempt.subject === 'mathematics') {
         unlockBadge('badge-math-master');
       }
+    }
+
+    // Check Quiz Champion (3 or more high scoring quizzes)
+    const highScores = Object.values(updatedScores).filter((s) => s >= 90);
+    if (highScores.length >= 3) {
+      unlockBadge('badge-quiz-champion');
     }
   };
 
@@ -868,6 +947,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         completeCodingProblem,
         completeActivity,
         unlockBadge,
+        unlockedBadgeModal,
+        closeBadgeModal,
         switchAgeGroup,
         addVideo,
         updateVideo,
