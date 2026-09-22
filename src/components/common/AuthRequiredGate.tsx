@@ -134,7 +134,7 @@ export const AuthRequiredGate: React.FC<AuthRequiredGateProps> = ({
   view,
   onOpenLogin,
 }) => {
-  const { navigateTo } = useApp();
+  const { navigateTo, loginAdmin } = useApp();
 
   const metadata = VIEW_METADATA[view] || {
     title: 'Sign In to Unlock Full Access',
@@ -211,11 +211,20 @@ export const AuthRequiredGate: React.FC<AuthRequiredGateProps> = ({
             </button>
 
             <button
+              onClick={() => loginAdmin('student@stemlearn.edu', 'student123')}
+              className="py-3.5 px-5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-sm transition shadow-md shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer"
+              title="Instant 1-Click access as Demo Student"
+            >
+              <Zap className="w-4 h-4 text-slate-950 fill-current" />
+              <span>Quick Student Unlock</span>
+            </button>
+
+            <button
               onClick={() => navigateTo('videos')}
               className="py-3.5 px-5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold rounded-xl text-sm transition flex items-center justify-center gap-2 cursor-pointer"
             >
               <PlayCircle className="w-4 h-4 text-slate-500" />
-              <span>Browse Free Video Lessons</span>
+              <span>Browse Free Lessons</span>
             </button>
           </div>
 
