@@ -44,7 +44,7 @@ export const HomeView: React.FC = () => {
 
           {/* Main Title */}
           <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.12]">
-            Master Science, Coding, Math & Engineering
+            SCIENCE,TECHNOLOGY, ENGINEERING & MATHEMATICS
           </h1>
 
           {/* Subheading */}
